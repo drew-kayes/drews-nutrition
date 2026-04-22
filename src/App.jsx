@@ -304,15 +304,26 @@ function AddScreen({ onSave, onBack }) {
 
   const handleFile = (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target.result;
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1024;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+        else { width = Math.round((width * MAX) / height); height = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
       const base64 = dataUrl.split(",")[1];
-      const mediaType = file.type;
-      setImage({ base64, mediaType, preview: dataUrl });
+      URL.revokeObjectURL(objectUrl);
+      setImage({ base64, mediaType: "image/jpeg", preview: dataUrl });
       setResult(null);
     };
-    reader.readAsDataURL(file);
+    img.src = objectUrl;
   };
 
   const analyze = async () => {
