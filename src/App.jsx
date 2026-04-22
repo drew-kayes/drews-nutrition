@@ -24,31 +24,13 @@ const db = async (path, method = "GET", body = null) => {
 };
 
 const analyzeMeal = async (base64Image, mediaType, description = "") => {
-  const prompt = description
-    ? `Analyze this meal. The user describes it as: "${description}". Estimate the nutritional content.`
-    : "Analyze this meal photo and estimate the nutritional content.";
-
-  const content = base64Image
-    ? [
-        { type: "image", source: { type: "base64", media_type: mediaType, data: base64Image } },
-        { type: "text", text: prompt + " Respond ONLY with a JSON object with these exact keys: {\"meal_name\": string, \"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number}. No markdown, no explanation, just the JSON." }
-      ]
-    : [{ type: "text", text: `The user describes a meal as: "${description}". Estimate the nutritional content. Respond ONLY with a JSON object: {\"meal_name\": string, \"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number}. No markdown, no explanation, just the JSON.` }];
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{ role: "user", content }],
-    }),
+    body: JSON.stringify({ base64Image, mediaType, description }),
   });
   if (!res.ok) throw new Error("API error");
-  const data = await res.json();
-  const text = data.content?.[0]?.text || "";
-  const clean = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean);
+  return await res.json();
 };
 
 function today() { return new Date().toISOString().slice(0, 10); }
