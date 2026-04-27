@@ -1,12 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 const SUPABASE_URL = "https://xsgdvhfhibstymoriocw.supabase.co";
 const SUPABASE_KEY = "sb_publishable_iJaYFSGQcNbEGdBr8sQC-A_rft4jxhS";
 const USER_ID = "drew_kayes";
 
-const TARGETS = { calories: 3000, protein: 190, carbs: 300, fat: 90 };
-
-const db = async (path, method = "GET", body = null) => {
+const api = async (path, method = "GET", body = null) => {
   const opts = {
     method,
     headers: {
@@ -23,15 +21,120 @@ const db = async (path, method = "GET", body = null) => {
   return t ? JSON.parse(t) : null;
 };
 
-const analyzeMeal = async (base64Image, mediaType, description = "") => {
-  const res = await fetch("/api/analyze", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ base64Image, mediaType, description }),
-  });
-  if (!res.ok) throw new Error("API error");
-  return await res.json();
-};
+const BENCH_PROGRAM = [
+  { week: 1, phase: "Volume", sets: 4, reps: 8, weight: 155, note: "Focus on form. Controlled negative." },
+  { week: 1, phase: "Volume", sets: 4, reps: 8, weight: 155, note: "Same as first session." },
+  { week: 2, phase: "Volume", sets: 4, reps: 8, weight: 160, note: "Add 5 lbs. Keep form tight." },
+  { week: 2, phase: "Volume", sets: 4, reps: 8, weight: 160, note: "" },
+  { week: 3, phase: "Volume", sets: 4, reps: 8, weight: 165, note: "Up 5 lbs again." },
+  { week: 3, phase: "Volume", sets: 4, reps: 8, weight: 165, note: "" },
+  { week: 4, phase: "Deload", sets: 3, reps: 8, weight: 150, note: "Deload week. Back off, recover." },
+  { week: 4, phase: "Deload", sets: 3, reps: 8, weight: 150, note: "" },
+  { week: 5, phase: "Strength", sets: 5, reps: 5, weight: 175, note: "Phase 2. Heavier, fewer reps." },
+  { week: 5, phase: "Strength", sets: 5, reps: 5, weight: 175, note: "" },
+  { week: 6, phase: "Strength", sets: 5, reps: 5, weight: 182, note: "+7 lbs." },
+  { week: 6, phase: "Strength", sets: 5, reps: 5, weight: 182, note: "" },
+  { week: 7, phase: "Strength", sets: 5, reps: 5, weight: 189, note: "+7 lbs." },
+  { week: 7, phase: "Strength", sets: 5, reps: 5, weight: 189, note: "" },
+  { week: 8, phase: "Deload", sets: 3, reps: 5, weight: 165, note: "Deload. Let your CNS recover." },
+  { week: 8, phase: "Deload", sets: 3, reps: 5, weight: 165, note: "" },
+  { week: 9, phase: "Power", sets: 4, reps: 3, weight: 195, note: "Phase 3. Heavy triples." },
+  { week: 9, phase: "Power", sets: 4, reps: 3, weight: 195, note: "" },
+  { week: 10, phase: "Power", sets: 4, reps: 3, weight: 202, note: "+7 lbs." },
+  { week: 10, phase: "Power", sets: 4, reps: 3, weight: 202, note: "" },
+  { week: 11, phase: "Power", sets: 4, reps: 3, weight: 209, note: "+7 lbs. Close to current 1RM." },
+  { week: 11, phase: "Power", sets: 4, reps: 3, weight: 209, note: "" },
+  { week: 12, phase: "Deload", sets: 3, reps: 3, weight: 185, note: "Deload before peak phase." },
+  { week: 12, phase: "Deload", sets: 3, reps: 3, weight: 185, note: "" },
+  { week: 13, phase: "Peak", sets: 3, reps: 2, weight: 215, note: "Peak phase. Doubles above old 1RM." },
+  { week: 13, phase: "Peak", sets: 3, reps: 2, weight: 215, note: "" },
+  { week: 14, phase: "Peak", sets: 3, reps: 2, weight: 220, note: "+5 lbs." },
+  { week: 14, phase: "Peak", sets: 3, reps: 2, weight: 220, note: "" },
+  { week: 15, phase: "Peak", sets: 2, reps: 1, weight: 230, note: "Singles. Build to near max." },
+  { week: 15, phase: "Peak", sets: 2, reps: 1, weight: 235, note: "Second session -- push to 235." },
+  { week: 16, phase: "Test", sets: 1, reps: 1, weight: 240, note: "Test week. New 1RM attempt: 240 lbs." },
+  { week: 16, phase: "Test", sets: 1, reps: 1, weight: 240, note: "Second attempt if needed." },
+];
+
+const DEFAULT_DAYS = [
+  {
+    id: "day1", label: "Day 1", title: "Chest / Shoulders / Tris", color: "#2563eb",
+    note: "Bench follows the 16-week program.",
+    exercises: [
+      { id: "bench", name: "Flat Barbell Bench Press", sets: 4, reps: "6", note: "See bench program for prescribed weight/reps.", programmed: true },
+      { id: "incline_db", name: "Incline Dumbbell Press", sets: 3, reps: "10", note: "" },
+      { id: "cable_lat", name: "Cable Lateral Raises", sets: 4, reps: "15", note: "Light. Lead with elbow. Pause at top." },
+      { id: "ohp", name: "Overhead Dumbbell Press", sets: 3, reps: "10", note: "" },
+      { id: "tri_push", name: "Tricep Rope Pushdown", sets: 3, reps: "15", note: "" },
+      { id: "calf_d1", name: "Calf Raises (standing)", sets: 4, reps: "15", note: "Full stretch at bottom. Slow negative." },
+    ],
+  },
+  {
+    id: "day2", label: "Day 2", title: "Back / Biceps", color: "#7c3aed",
+    note: "Incline curl and hammer curl are the arm thickness drivers.",
+    exercises: [
+      { id: "pullup", name: "Weighted Pull-ups / Lat Pulldown", sets: 4, reps: "10", note: "Full hang at bottom." },
+      { id: "cable_row", name: "Seated Cable Row", sets: 4, reps: "12", note: "Elbows tight. Squeeze at peak." },
+      { id: "incline_curl", name: "Incline Dumbbell Curl", sets: 3, reps: "12", note: "Long head stretch. Builds peak." },
+      { id: "hammer", name: "Hammer Curl", sets: 3, reps: "12", note: "" },
+      { id: "reverse_curl", name: "Reverse Curl", sets: 3, reps: "15", note: "Forearm size." },
+      { id: "calf_d2", name: "Calf Raises (standing)", sets: 4, reps: "15", note: "Full stretch. Slow negative." },
+    ],
+  },
+  {
+    id: "day3", label: "Day 3", title: "Legs", color: "#059669",
+    note: "Start light. Form first. Weeks 1-4: sled + RDL + calves only.",
+    exercises: [
+      { id: "sled", name: "Sled Press", sets: 3, reps: "10", note: "Feet low and close. Full depth.", phase1: true },
+      { id: "rdl", name: "Romanian Deadlift", sets: 3, reps: "12", note: "Hips back. Bar drags down legs.", phase1: true },
+      { id: "stand_calf", name: "Standing Calf Raise", sets: 5, reps: "15", note: "Heavy. 3-sec negative. Full stretch.", phase1: true },
+      { id: "seat_calf", name: "Seated Calf Raise", sets: 3, reps: "20", note: "Hits soleus. Different angle.", phase1: true },
+      { id: "leg_press", name: "Leg Press (add wk 5)", sets: 3, reps: "12", note: "Same foot position as sled.", phase1: false },
+      { id: "lunges", name: "Walking Lunges (add wk 5)", sets: 3, reps: "20", note: "Full stride.", phase1: false },
+      { id: "leg_ext", name: "Leg Extension (add wk 6)", sets: 3, reps: "15", note: "Full contraction at top.", phase1: false },
+    ],
+  },
+  {
+    id: "day4", label: "Day 4", title: "Swim", color: "#0284c7",
+    note: "Keep it. 1-2x per week. Do not trade for a lifting session.",
+    swim: true, exercises: [],
+  },
+  {
+    id: "day5", label: "Day 5", title: "Chest / Shoulders / Tris", color: "#2563eb",
+    note: "Second bench session of the week. Follow the program.",
+    exercises: [
+      { id: "bench_d5", name: "Flat Barbell Bench Press", sets: 4, reps: "6", note: "See bench program for prescribed weight/reps.", programmed: true },
+      { id: "cable_fly", name: "Cable Fly / Pec Deck", sets: 3, reps: "12", note: "Full stretch at open position." },
+      { id: "arnold", name: "Arnold Press", sets: 3, reps: "10", note: "Full rotation. All three delt heads." },
+      { id: "lat_drop", name: "Lateral Raise Dropset", sets: 3, reps: "Failure", note: "Start heavy, drop 3x." },
+      { id: "skull", name: "Skull Crushers", sets: 3, reps: "12", note: "Elbows in. Full extension." },
+      { id: "calf_d5", name: "Calf Raises (standing)", sets: 4, reps: "15", note: "Full stretch. Slow negative." },
+    ],
+  },
+  {
+    id: "day6", label: "Day 6", title: "Back / Biceps", color: "#7c3aed",
+    note: "Heaviest row of the week. Face pulls are shoulder health insurance.",
+    exercises: [
+      { id: "tbar", name: "Barbell / T-Bar Row", sets: 4, reps: "10", note: "Heaviest row of the week." },
+      { id: "single_row", name: "Single Arm Dumbbell Row", sets: 3, reps: "12", note: "Full range. Lat stretch at bottom." },
+      { id: "face_pull", name: "Face Pulls", sets: 3, reps: "20", note: "Rear delt + rotator cuff. Do not skip." },
+      { id: "incline_curl2", name: "Incline Dumbbell Curl", sets: 3, reps: "12", note: "Frequency builds size." },
+      { id: "farmer", name: "Farmer Carry (40 yds)", sets: 3, reps: "40 yds", note: "Grip, forearms, traps. Go heavy." },
+      { id: "calf_d6", name: "Calf Raises (standing)", sets: 4, reps: "15", note: "Full stretch. Slow negative." },
+    ],
+  },
+  {
+    id: "day7", label: "Day 7", title: "Active Recovery", color: "#d97706",
+    note: "10-15 min. Directly impacts squat depth and calf flexibility.",
+    mobility: true,
+    exercises: [
+      { id: "couch", name: "Couch Stretch", sets: 1, reps: "2 min/side", note: "Hip flexors. Critical for quad depth." },
+      { id: "hip90", name: "90/90 Hip Stretch", sets: 1, reps: "2 min/side", note: "" },
+      { id: "ankle", name: "Ankle Circles + Calf Stretch", sets: 1, reps: "2 min", note: "" },
+      { id: "band", name: "Band Pull-Aparts", sets: 3, reps: "20", note: "Shoulder joint health." },
+    ],
+  },
+];
 
 function today() { return new Date().toISOString().slice(0, 10); }
 function formatDate(d) {
@@ -40,474 +143,471 @@ function formatDate(d) {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return `${months[parseInt(m)-1]} ${parseInt(day)}`;
 }
-function pct(val, target) { return Math.min(100, Math.round((val / target) * 100)); }
+function uid() { return Math.random().toString(36).slice(2, 10); }
 
 const G = () => (
   <style>{`
-    @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body, #root { height: 100%; background: #0a0a0e; }
+    html, body, #root { height: 100%; background: #0f0f13; }
     body { font-family: 'DM Sans', sans-serif; color: #f0f0f0; overflow-x: hidden; }
     input, button, textarea { font-family: 'DM Sans', sans-serif; }
     input, textarea { outline: none; }
     button { cursor: pointer; }
     button:active { opacity: 0.75; }
-    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar { width: 3px; height: 3px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #2a2a38; border-radius: 2px; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-    @keyframes barFill { from { width: 0%; } to { width: var(--w); } }
-    .fadeup { animation: fadeUp 0.25s ease both; }
-    .bar-animate { animation: barFill 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .fadein { animation: fadeIn 0.2s ease both; }
   `}</style>
 );
 
 export default function App() {
   const [screen, setScreen] = useState("home");
-  const [meals, setMeals] = useState([]);
+  const [activeDay, setActiveDay] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [benchLog, setBenchLog] = useState([]);
+  const [customDays, setCustomDays] = useState(null);
+  const [session, setSession] = useState(null);
+  const [activeExercise, setActiveExercise] = useState(0);
+  const [swimLog, setSwimLog] = useState({ duration: "", distance: "", notes: "" });
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(today());
+  const [editingDay, setEditingDay] = useState(null);
 
-  useEffect(() => { loadMeals(); }, []);
+  const days = customDays || DEFAULT_DAYS;
 
-  const loadMeals = async () => {
+  useEffect(() => { loadAll(); }, []);
+
+  const loadAll = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const data = await db(`/nutrition_logs?user_id=eq.${USER_ID}&order=logged_at.desc`);
-      setMeals(data || []);
+      const [s, b, c] = await Promise.all([
+        api(`/workout_sessions?user_id=eq.${USER_ID}&order=date.desc`),
+        api(`/bench_log?user_id=eq.${USER_ID}&order=date.asc`),
+        api(`/workout_config?user_id=eq.${USER_ID}`).catch(() => []),
+      ]);
+      setSessions(s || []);
+      setBenchLog(b || []);
+      if (c && c.length > 0 && c[0].days) setCustomDays(c[0].days);
     } catch {
-      setError("Could not load data.");
+      setError("Could not connect.");
     }
     setLoading(false);
   };
 
-  const saveMeal = async (meal) => {
-    const record = { ...meal, user_id: USER_ID, id: `${USER_ID}_${Date.now()}`, logged_at: new Date().toISOString(), date: today() };
-    await db("/nutrition_logs", "POST", record);
-    await loadMeals();
+  const saveDays = async (newDays) => {
+    setCustomDays(newDays);
+    try {
+      await api("/workout_config", "POST", { id: `${USER_ID}_config`, user_id: USER_ID, days: newDays });
+    } catch {}
   };
 
-  const deleteMeal = async (id) => {
-    await db(`/nutrition_logs?id=eq.${id}`, "DELETE");
-    await loadMeals();
+  const startDay = (day) => {
+    setActiveDay(day);
+    const existing = sessions.find(s => s.day_id === day.id && s.date === today());
+    setSession(existing
+      ? { ...existing }
+      : { id: `${USER_ID}_${day.id}_${today()}`, user_id: USER_ID, day_id: day.id, date: today(), sets: {}, notes: {}, swim_log: null, complete: false }
+    );
+    setActiveExercise(0);
+    setSwimLog({ duration: "", distance: "", notes: "" });
+    setScreen("day");
   };
 
-  const todayMeals = meals.filter(m => m.date === selectedDate);
-  const totals = todayMeals.reduce((acc, m) => ({
-    calories: acc.calories + (m.calories || 0),
-    protein: acc.protein + (m.protein || 0),
-    carbs: acc.carbs + (m.carbs || 0),
-    fat: acc.fat + (m.fat || 0),
-  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
-
-  if (loading) return <><G /><Loader /></>;
-  if (screen === "add") return <><G /><AddScreen onSave={async (m) => { await saveMeal(m); setScreen("home"); }} onBack={() => setScreen("home")} /></>;
-  if (screen === "history") return <><G /><HistoryScreen meals={meals} onBack={() => setScreen("home")} /></>;
-
-  return <><G /><HomeScreen totals={totals} meals={todayMeals} targets={TARGETS} onAdd={() => setScreen("add")} onHistory={() => setScreen("history")} onDelete={deleteMeal} selectedDate={selectedDate} setSelectedDate={setSelectedDate} error={error} onRetry={loadMeals} /></>;
-}
-
-function HomeScreen({ totals, meals, targets, onAdd, onHistory, onDelete, selectedDate, setSelectedDate, error, onRetry }) {
-  const isToday = selectedDate === today();
-
-  return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0e", paddingBottom: 100 }}>
-      <div style={{ padding: "max(36px, env(safe-area-inset-top)) 20px 20px", background: "linear-gradient(180deg, #0f0f18 0%, #0a0a0e 100%)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 11, letterSpacing: 4, color: "#444", textTransform: "uppercase", marginBottom: 4 }}>Drew's</div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, letterSpacing: -0.5 }}>Nutrition</div>
-          </div>
-          <button onClick={onHistory} style={{ background: "#1a1a24", border: "1px solid #2a2a38", borderRadius: 10, color: "#888", fontSize: 12, padding: "8px 14px" }}>History</button>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
-          <button onClick={() => { const d = new Date(selectedDate); d.setDate(d.getDate() - 1); setSelectedDate(d.toISOString().slice(0,10)); }}
-            style={{ background: "#1a1a24", border: "1px solid #2a2a38", borderRadius: 8, color: "#666", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
-          <div style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 600, color: isToday ? "#f0f0f0" : "#888" }}>
-            {isToday ? "Today" : formatDate(selectedDate)}
-          </div>
-          <button onClick={() => { if (!isToday) { const d = new Date(selectedDate); d.setDate(d.getDate() + 1); setSelectedDate(d.toISOString().slice(0,10)); } }}
-            style={{ background: isToday ? "#0a0a0e" : "#1a1a24", border: `1px solid ${isToday ? "#1a1a24" : "#2a2a38"}`, borderRadius: 8, color: isToday ? "#333" : "#666", width: 32, height: 32, fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>›</button>
-        </div>
-      </div>
-
-      {error && (
-        <div style={{ margin: "0 20px 16px", background: "#2a0d0d", border: "1px solid #5a1a1a", borderRadius: 8, padding: "10px 14px", display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "#f87171", fontSize: 13 }}>{error}</span>
-          <button onClick={onRetry} style={{ background: "none", border: "1px solid #5a1a1a", borderRadius: 6, color: "#f87171", fontSize: 12, padding: "3px 8px" }}>Retry</button>
-        </div>
-      )}
-
-      <div style={{ padding: "0 20px" }} className="fadeup">
-        <MacroRings totals={totals} targets={targets} />
-        <MacroBars totals={totals} targets={targets} />
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 28, marginBottom: 14 }}>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "#555" }}>Meals</div>
-          {isToday && <button onClick={onAdd} style={{ background: "#1a2a4a", border: "1px solid #2a4a8a", borderRadius: 10, color: "#60a5fa", fontSize: 13, fontWeight: 600, padding: "8px 16px" }}>+ Add Meal</button>}
-        </div>
-
-        {meals.length === 0 && (
-          <div style={{ textAlign: "center", padding: "40px 0", color: "#333" }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>🍽</div>
-            <div style={{ fontSize: 14 }}>{isToday ? "No meals logged yet" : "No meals on this day"}</div>
-            {isToday && <div style={{ fontSize: 13, color: "#2a2a38", marginTop: 6 }}>Tap + Add Meal to get started</div>}
-          </div>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {meals.map(meal => <MealCard key={meal.id} meal={meal} onDelete={() => onDelete(meal.id)} isToday={isToday} />)}
-        </div>
-      </div>
-
-      {isToday && (
-        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px 20px", paddingBottom: "max(20px, env(safe-area-inset-bottom))", background: "linear-gradient(0deg, #0a0a0e 60%, transparent)" }}>
-          <button onClick={onAdd} style={{ width: "100%", background: "linear-gradient(135deg, #1d4ed8, #2563eb)", border: "none", borderRadius: 14, color: "#fff", fontSize: 16, fontWeight: 700, padding: 16, fontFamily: "'Syne', sans-serif", letterSpacing: 0.5 }}>
-            + Log a Meal
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MacroRings({ totals, targets }) {
-  const calPct = pct(totals.calories, targets.calories);
-  const protPct = pct(totals.protein, targets.protein);
-  const remaining = targets.calories - totals.calories;
-
-  return (
-    <div style={{ background: "#0f0f18", border: "1px solid #1a1a28", borderRadius: 16, padding: "20px", marginBottom: 16, display: "flex", alignItems: "center", gap: 20 }}>
-      <Ring value={calPct} color="#f59e0b" size={80}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>{Math.round(totals.calories)}</div>
-          <div style={{ fontSize: 9, color: "#555", letterSpacing: 1 }}>CAL</div>
-        </div>
-      </Ring>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, color: "#888", marginBottom: 4 }}>
-          {remaining > 0 ? <><span style={{ color: "#f0f0f0", fontWeight: 600 }}>{remaining}</span> cal remaining</> : <span style={{ color: "#f87171", fontWeight: 600 }}>Over by {Math.abs(remaining)}</span>}
-        </div>
-        <div style={{ fontSize: 12, color: "#555" }}>Target: {targets.calories} cal</div>
-        <div style={{ marginTop: 10, fontSize: 13 }}>
-          <span style={{ color: "#4ade80", fontWeight: 600 }}>{Math.round(totals.protein)}g</span>
-          <span style={{ color: "#444" }}> / {targets.protein}g protein</span>
-        </div>
-        <div style={{ fontSize: 12, color: "#555", marginTop: 2 }}>{protPct}% of daily goal</div>
-      </div>
-    </div>
-  );
-}
-
-function Ring({ value, color, size, children }) {
-  const r = (size - 10) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (value / 100) * circ;
-  return (
-    <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1a1a28" strokeWidth={6} />
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={6}
-          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(0.34,1.56,0.64,1)" }} />
-      </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{children}</div>
-    </div>
-  );
-}
-
-function MacroBars({ totals, targets }) {
-  const macros = [
-    { key: "protein", label: "Protein", unit: "g", color: "#4ade80", val: totals.protein, target: targets.protein },
-    { key: "carbs", label: "Carbs", unit: "g", color: "#60a5fa", val: totals.carbs, target: targets.carbs },
-    { key: "fat", label: "Fat", unit: "g", color: "#f59e0b", val: totals.fat, target: targets.fat },
-  ];
-  return (
-    <div style={{ background: "#0f0f18", border: "1px solid #1a1a28", borderRadius: 16, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-      {macros.map(m => {
-        const p = pct(m.val, m.target);
-        return (
-          <div key={m.key}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <div style={{ fontSize: 12, color: "#888" }}>{m.label}</div>
-              <div style={{ fontSize: 12, fontFamily: "'DM Mono', monospace" }}>
-                <span style={{ color: m.color, fontWeight: 600 }}>{Math.round(m.val)}</span>
-                <span style={{ color: "#444" }}> / {m.target}{m.unit}</span>
-              </div>
-            </div>
-            <div style={{ height: 6, background: "#1a1a28", borderRadius: 3, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${p}%`, background: m.color, borderRadius: 3, transition: "width 0.6s cubic-bezier(0.34,1.56,0.64,1)" }} />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function MealCard({ meal, onDelete, isToday }) {
-  const [confirm, setConfirm] = useState(false);
-  const time = meal.logged_at ? new Date(meal.logged_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
-  return (
-    <div style={{ background: "#0f0f18", border: "1px solid #1a1a28", borderRadius: 14, overflow: "hidden" }} className="fadeup">
-      {meal.image_url && <img src={meal.image_url} alt={meal.meal_name} style={{ width: "100%", height: 160, objectFit: "cover" }} />}
-      <div style={{ padding: "14px 16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{meal.meal_name}</div>
-            {time && <div style={{ fontSize: 11, color: "#444" }}>{time}</div>}
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Syne', sans-serif", color: "#f59e0b" }}>{meal.calories}</div>
-            <div style={{ fontSize: 10, color: "#555", letterSpacing: 1 }}>CAL</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {[["P", meal.protein, "#4ade80"], ["C", meal.carbs, "#60a5fa"], ["F", meal.fat, "#f59e0b"]].map(([l, v, c]) => (
-            <div key={l} style={{ flex: 1, background: "#15151f", borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: c, fontFamily: "'DM Mono', monospace" }}>{Math.round(v)}g</div>
-              <div style={{ fontSize: 9, color: "#444", letterSpacing: 1, marginTop: 1 }}>{l === "P" ? "PROTEIN" : l === "C" ? "CARBS" : "FAT"}</div>
-            </div>
-          ))}
-        </div>
-        {isToday && (
-          <div style={{ marginTop: 12 }}>
-            {!confirm
-              ? <button onClick={() => setConfirm(true)} style={{ background: "none", border: "none", color: "#444", fontSize: 12, padding: 0 }}>Delete</button>
-              : <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12, color: "#888" }}>Remove this meal?</span>
-                  <button onClick={onDelete} style={{ background: "#2a0d0d", border: "1px solid #5a1a1a", borderRadius: 6, color: "#f87171", fontSize: 12, padding: "4px 10px" }}>Yes</button>
-                  <button onClick={() => setConfirm(false)} style={{ background: "#1a1a24", border: "1px solid #2a2a38", borderRadius: 6, color: "#888", fontSize: 12, padding: "4px 10px" }}>No</button>
-                </div>
-            }
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function AddScreen({ onSave, onBack }) {
-  const [mode, setMode] = useState("photo"); // photo | manual
-  const [image, setImage] = useState(null); // { base64, mediaType, preview }
-  const [description, setDescription] = useState("");
-  const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const fileRef = useRef();
-
-  const [manual, setManual] = useState({ meal_name: "", calories: "", protein: "", carbs: "", fat: "" });
-
-  const handleFile = (file) => {
-    if (!file) return;
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      const MAX = 1024;
-      let { width, height } = img;
-      if (width > MAX || height > MAX) {
-        if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
-        else { width = Math.round((width * MAX) / height); height = MAX; }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-      const base64 = dataUrl.split(",")[1];
-      URL.revokeObjectURL(objectUrl);
-      setImage({ base64, mediaType: "image/jpeg", preview: dataUrl });
-      setResult(null);
-    };
-    img.src = objectUrl;
+  const updateSet = (exId, setIdx, field, value) => {
+    setSession(prev => {
+      const sets = { ...prev.sets };
+      if (!sets[exId]) sets[exId] = [];
+      sets[exId] = [...sets[exId]];
+      if (!sets[exId][setIdx]) sets[exId][setIdx] = { weight: "", reps: "" };
+      sets[exId][setIdx] = { ...sets[exId][setIdx], [field]: value };
+      return { ...prev, sets };
+    });
   };
 
-  const analyze = async () => {
-    if (!image && !description.trim()) return;
-    setAnalyzing(true);
+  const updateNote = (exId, value) => {
+    setSession(prev => ({ ...prev, notes: { ...(prev.notes || {}), [exId]: value } }));
+  };
+
+  const saveSession = async () => {
+    setSaving(true);
     setError(null);
     try {
-      const res = await analyzeMeal(image?.base64 || null, image?.mediaType || null, description);
-      setResult(res);
+      const final = { ...session, complete: true };
+      if (activeDay.swim) final.swim_log = swimLog;
+      await api("/workout_sessions", "POST", final);
+      const benchEx = activeDay.exercises.find(e => e.programmed);
+      if (benchEx && final.sets[benchEx.id]?.length) {
+        const existing = benchLog.find(b => b.date === today());
+        if (existing) {
+          await api(`/bench_log?user_id=eq.${USER_ID}&date=eq.${today()}`, "PATCH", { sets: final.sets[benchEx.id] });
+        } else {
+          await api("/bench_log", "POST", { user_id: USER_ID, date: today(), sets: final.sets[benchEx.id] });
+        }
+      }
+      await loadAll();
+      setScreen("home");
+      setSession(null);
     } catch {
-      setError("Could not analyze. Try again or enter manually.");
+      setError("Save failed. Try again.");
     }
-    setAnalyzing(false);
+    setSaving(false);
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const meal = result
-        ? { ...result, image_url: image?.preview || null }
-        : { meal_name: manual.meal_name || "Meal", calories: parseInt(manual.calories) || 0, protein: parseFloat(manual.protein) || 0, carbs: parseFloat(manual.carbs) || 0, fat: parseFloat(manual.fat) || 0 };
-      await onSave(meal);
-    } catch {
-      setError("Failed to save.");
-      setSaving(false);
-    }
+  const getLastWeight = (dayId, exId, setIdx) => {
+    const last = sessions.filter(s => s.day_id === dayId && s.complete && s.date < today()).sort((a, b) => b.date.localeCompare(a.date))[0];
+    return last?.sets?.[exId]?.[setIdx]?.weight || "";
   };
 
+  const getBenchPrescription = () => {
+    const idx = Math.min(benchLog.length, BENCH_PROGRAM.length - 1);
+    return BENCH_PROGRAM[idx];
+  };
+
+  if (loading) return <><G /><Loader /></>;
+  if (screen === "bench") return <><G /><BenchScreen benchLog={benchLog} onBack={() => setScreen("home")} /></>;
+  if (screen === "history") return <><G /><HistoryScreen sessions={sessions} days={days} onBack={() => setScreen("home")} /></>;
+  if (screen === "edit" && editingDay) return <><G /><EditDayScreen day={editingDay} onSave={async (updated) => { await saveDays(days.map(d => d.id === updated.id ? updated : d)); setScreen("home"); }} onBack={() => setScreen("home")} /></>;
+  if (screen === "day" && activeDay && session) return (
+    <><G /><DayScreen
+      day={activeDay} session={session} activeExercise={activeExercise}
+      setActiveExercise={setActiveExercise} updateSet={updateSet} updateNote={updateNote}
+      onSave={saveSession} onBack={() => setScreen("home")}
+      getLastWeight={(exId, si) => getLastWeight(activeDay.id, exId, si)}
+      swimLog={swimLog} setSwimLog={setSwimLog} saving={saving} error={error}
+      benchPrescription={getBenchPrescription()}
+    /></>
+  );
+
+  return <><G /><HomeScreen days={days} sessions={sessions} onSelectDay={startDay} onHistory={() => setScreen("history")} onBench={() => setScreen("bench")} onEdit={(day) => { setEditingDay(day); setScreen("edit"); }} error={error} onRetry={loadAll} /></>;
+}
+
+function HomeScreen({ days, sessions, onSelectDay, onHistory, onBench, onEdit, error, onRetry }) {
+  const todayStr = today();
+  const completedToday = new Set(sessions.filter(s => s.date === todayStr && s.complete).map(s => s.day_id));
+  const lastSession = (dayId) => sessions.filter(s => s.day_id === dayId && s.complete).sort((a,b) => b.date.localeCompare(a.date))[0];
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0e", display: "flex", flexDirection: "column" }}>
-      <div style={{ padding: "max(20px, env(safe-area-inset-top)) 20px 16px", borderBottom: "1px solid #1a1a22", display: "flex", alignItems: "center", gap: 14, background: "#0f0f18" }}>
-        <button onClick={onBack} style={{ background: "#1a1a24", border: "none", color: "#666", width: 36, height: 36, borderRadius: 9, fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700 }}>Log a Meal</div>
+    <div style={{ minHeight: "100vh", background: "#0f0f13", paddingBottom: 48 }}>
+      <div style={{ padding: "max(32px, env(safe-area-inset-top)) 20px 16px", borderBottom: "1px solid #1a1a22" }}>
+        <div style={{ fontSize: 11, letterSpacing: 3, color: "#444", textTransform: "uppercase", marginBottom: 4 }}>Drew's</div>
+        <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5 }}>Training</div>
+        <div style={{ fontSize: 13, color: "#555", marginTop: 4 }}>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</div>
       </div>
-
-      <div style={{ display: "flex", padding: "16px 20px 0", gap: 10 }}>
-        {["photo", "manual"].map(m => (
-          <button key={m} onClick={() => { setMode(m); setResult(null); setError(null); }} style={{
-            flex: 1, padding: "10px", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600,
-            background: mode === m ? "#1d4ed8" : "#1a1a24",
-            color: mode === m ? "#fff" : "#666",
-          }}>{m === "photo" ? "📷 Photo" : "✏️ Manual"}</button>
-        ))}
+      {error && (
+        <div style={{ margin: "12px 20px 0", background: "#2a0d0d", border: "1px solid #5a1a1a", borderRadius: 8, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ color: "#f87171", fontSize: 13 }}>{error}</span>
+          <button onClick={onRetry} style={{ background: "none", border: "1px solid #5a1a1a", borderRadius: 6, color: "#f87171", fontSize: 12, padding: "4px 10px" }}>Retry</button>
+        </div>
+      )}
+      <div style={{ padding: "14px 20px", display: "flex", gap: 10 }}>
+        <button onClick={onHistory} style={pill("#1e1e28", "#888")}>History</button>
+        <button onClick={onBench} style={pill("#0d1f0d", "#4ade80")}>Bench Program</button>
       </div>
-
-      <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
-        {mode === "photo" && (
-          <div className="fadeup">
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
-
-            {!image ? (
-              <button onClick={() => fileRef.current.click()} style={{ width: "100%", height: 200, background: "#0f0f18", border: "2px dashed #2a2a38", borderRadius: 16, color: "#444", fontSize: 14, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
-                <div style={{ fontSize: 40 }}>📷</div>
-                <div>Tap to take a photo or upload</div>
-                <div style={{ fontSize: 12, color: "#333" }}>Works with any meal, plate, or food</div>
-              </button>
-            ) : (
-              <div style={{ position: "relative", borderRadius: 16, overflow: "hidden", marginBottom: 16 }}>
-                <img src={image.preview} alt="meal" style={{ width: "100%", maxHeight: 260, objectFit: "cover", display: "block" }} />
-                <button onClick={() => { setImage(null); setResult(null); }} style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,0.7)", border: "none", color: "#fff", borderRadius: "50%", width: 30, height: 30, fontSize: 14 }}>✕</button>
+      <div style={{ padding: "4px 20px 0" }} className="fadein">
+        <div style={{ fontSize: 11, letterSpacing: 2, color: "#333", textTransform: "uppercase", marginBottom: 14 }}>Select Day</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {days.map(day => {
+            const done = completedToday.has(day.id);
+            const last = lastSession(day.id);
+            return (
+              <div key={day.id} style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => onSelectDay(day)} style={{
+                  flex: 1, background: done ? "#0d1f0d" : "#15151e",
+                  border: `1px solid ${done ? "#1a3a1a" : "#1e1e28"}`,
+                  borderLeft: `3px solid ${done ? "#4ade80" : day.color}`,
+                  borderRadius: 10, padding: "15px 16px",
+                  textAlign: "left", color: "#f0f0f0",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: done ? "#4ade80" : day.color, letterSpacing: 1, textTransform: "uppercase", marginBottom: 3, fontFamily: "'DM Mono', monospace" }}>{day.label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600 }}>{day.title}</div>
+                    {last && <div style={{ fontSize: 11, color: "#444", marginTop: 3 }}>Last: {formatDate(last.date)}</div>}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {done && <span style={{ color: "#4ade80", fontSize: 16 }}>✓</span>}
+                    <span style={{ color: "#333", fontSize: 22 }}>›</span>
+                  </div>
+                </button>
+                {!day.swim && !day.mobility && (
+                  <button onClick={() => onEdit(day)} style={{ background: "#15151e", border: "1px solid #1e1e28", borderRadius: 10, color: "#555", fontSize: 20, width: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>⋯</button>
+                )}
               </div>
-            )}
-
-            <div style={{ marginTop: 16, marginBottom: 16 }}>
-              <div style={{ fontSize: 11, color: "#444", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>Description (optional)</div>
-              <textarea value={description} onChange={e => setDescription(e.target.value)}
-                placeholder="e.g. grilled chicken breast, white rice, side of broccoli"
-                rows={2} style={{ width: "100%", background: "#0f0f18", border: "1px solid #2a2a38", borderRadius: 10, color: "#f0f0f0", fontSize: 14, padding: "12px 14px", resize: "none", outline: "none" }} />
-            </div>
-
-            {!result && (
-              <button onClick={analyze} disabled={(!image && !description.trim()) || analyzing} style={{ width: "100%", background: (!image && !description.trim()) ? "#1a1a24" : "linear-gradient(135deg, #1d4ed8, #2563eb)", border: "none", borderRadius: 12, color: (!image && !description.trim()) ? "#444" : "#fff", fontSize: 15, fontWeight: 700, padding: 15, fontFamily: "'Syne', sans-serif" }}>
-                {analyzing ? <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}><Spinner />Analyzing...</span> : "Analyze Meal"}
-              </button>
-            )}
-
-            {error && <div style={{ marginTop: 12, background: "#2a0d0d", border: "1px solid #5a1a1a", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 13 }}>{error}</div>}
-
-            {result && <ResultEditor result={result} setResult={setResult} onSave={handleSave} saving={saving} onRetry={() => setResult(null)} />}
-          </div>
-        )}
-
-        {mode === "manual" && (
-          <div className="fadeup">
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {[
-                { key: "meal_name", label: "Meal Name", placeholder: "e.g. Chicken & Rice", type: "text" },
-                { key: "calories", label: "Calories", placeholder: "e.g. 650", type: "number" },
-                { key: "protein", label: "Protein (g)", placeholder: "e.g. 48", type: "number" },
-                { key: "carbs", label: "Carbs (g)", placeholder: "e.g. 72", type: "number" },
-                { key: "fat", label: "Fat (g)", placeholder: "e.g. 12", type: "number" },
-              ].map(f => (
-                <div key={f.key}>
-                  <div style={{ fontSize: 11, color: "#555", letterSpacing: 2, textTransform: "uppercase", marginBottom: 7 }}>{f.label}</div>
-                  <input type={f.type} inputMode={f.type === "number" ? "decimal" : "text"} placeholder={f.placeholder}
-                    value={manual[f.key]} onChange={e => setManual(p => ({ ...p, [f.key]: e.target.value }))}
-                    style={{ width: "100%", background: "#0f0f18", border: "1px solid #2a2a38", borderRadius: 10, color: "#f0f0f0", fontSize: 16, padding: "12px 14px", fontFamily: "'DM Mono', monospace" }} />
-                </div>
-              ))}
-            </div>
-            {error && <div style={{ marginTop: 12, background: "#2a0d0d", border: "1px solid #5a1a1a", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 13 }}>{error}</div>}
-            <button onClick={handleSave} disabled={saving || !manual.meal_name} style={{ width: "100%", marginTop: 24, background: !manual.meal_name ? "#1a1a24" : "linear-gradient(135deg, #166534, #16a34a)", border: "none", borderRadius: 12, color: !manual.meal_name ? "#444" : "#fff", fontSize: 15, fontWeight: 700, padding: 15, fontFamily: "'Syne', sans-serif" }}>
-              {saving ? "Saving..." : "Save Meal ✓"}
-            </button>
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
-function ResultEditor({ result, setResult, onSave, saving, onRetry }) {
-  const fields = [
-    { key: "calories", label: "Calories", color: "#f59e0b" },
-    { key: "protein", label: "Protein (g)", color: "#4ade80" },
-    { key: "carbs", label: "Carbs (g)", color: "#60a5fa" },
-    { key: "fat", label: "Fat (g)", color: "#f59e0b" },
-  ];
+function EditDayScreen({ day, onSave, onBack }) {
+  const [exercises, setExercises] = useState(day.exercises.map(e => ({ ...e })));
+  const [saving, setSaving] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newEx, setNewEx] = useState({ name: "", sets: "3", reps: "10" });
+
+  const updateEx = (idx, field, val) => setExercises(prev => prev.map((e, i) => i === idx ? { ...e, [field]: val } : e));
+  const deleteEx = (idx) => setExercises(prev => prev.filter((_, i) => i !== idx));
+  const addEx = () => {
+    if (!newEx.name.trim()) return;
+    setExercises(prev => [...prev, { id: uid(), name: newEx.name, sets: parseInt(newEx.sets) || 3, reps: newEx.reps || "10", note: "" }]);
+    setNewEx({ name: "", sets: "3", reps: "10" });
+    setAdding(false);
+  };
+
   return (
-    <div style={{ marginTop: 20 }} className="fadeup">
-      <div style={{ background: "#0f1a0f", border: "1px solid #1a3a1a", borderRadius: 14, padding: 16, marginBottom: 16 }}>
-        <div style={{ fontSize: 11, color: "#4ade80", letterSpacing: 2, textTransform: "uppercase", marginBottom: 10, fontFamily: "'Syne', sans-serif" }}>Analysis Complete -- Edit if Needed</div>
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: "#555", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Meal Name</div>
-          <input value={result.meal_name} onChange={e => setResult(p => ({ ...p, meal_name: e.target.value }))}
-            style={{ width: "100%", background: "#15151f", border: "1px solid #2a2a38", borderRadius: 8, color: "#f0f0f0", fontSize: 14, padding: "10px 12px", outline: "none" }} />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {fields.map(f => (
-            <div key={f.key}>
-              <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, textTransform: "uppercase", marginBottom: 5 }}>{f.label}</div>
-              <input type="number" inputMode="decimal" value={result[f.key]} onChange={e => setResult(p => ({ ...p, [f.key]: parseFloat(e.target.value) || 0 }))}
-                style={{ width: "100%", background: "#15151f", border: `1px solid #2a2a38`, borderRadius: 8, color: f.color, fontSize: 16, fontWeight: 700, padding: "10px 12px", outline: "none", fontFamily: "'DM Mono', monospace" }} />
+    <div style={wrap()}>
+      <TopBar title={`Edit ${day.label}`} sub={day.title} color={day.color} onBack={onBack} />
+      <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+        <div style={{ fontSize: 11, color: "#555", letterSpacing: 2, textTransform: "uppercase", marginBottom: 14 }}>Exercises</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {exercises.map((ex, idx) => (
+            <div key={ex.id} style={{ background: "#15151e", border: "1px solid #1e1e28", borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <input value={ex.name} onChange={e => updateEx(idx, "name", e.target.value)}
+                  style={{ background: "none", border: "none", color: "#f0f0f0", fontSize: 15, fontWeight: 600, flex: 1, outline: "none" }} />
+                <button onClick={() => deleteEx(idx)} style={{ background: "none", border: "none", color: "#555", fontSize: 18, marginLeft: 8 }}>✕</button>
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: "#444", letterSpacing: 2, marginBottom: 5 }}>SETS</div>
+                  <input type="number" value={ex.sets} onChange={e => updateEx(idx, "sets", parseInt(e.target.value) || 3)} style={inp()} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: "#444", letterSpacing: 2, marginBottom: 5 }}>REPS</div>
+                  <input value={ex.reps} onChange={e => updateEx(idx, "reps", e.target.value)} style={inp()} />
+                </div>
+              </div>
             </div>
           ))}
         </div>
+        {adding ? (
+          <div style={{ background: "#0d1a2a", border: "1px solid #1e3a5a", borderRadius: 12, padding: "14px 16px", marginTop: 12 }}>
+            <div style={{ fontSize: 12, color: "#60a5fa", marginBottom: 12 }}>New Exercise</div>
+            <input placeholder="Exercise name" value={newEx.name} onChange={e => setNewEx(p => ({ ...p, name: e.target.value }))} style={{ ...inp(), marginBottom: 10 }} />
+            <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: "#444", letterSpacing: 2, marginBottom: 5 }}>SETS</div>
+                <input type="number" value={newEx.sets} onChange={e => setNewEx(p => ({ ...p, sets: e.target.value }))} style={inp()} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: "#444", letterSpacing: 2, marginBottom: 5 }}>REPS</div>
+                <input value={newEx.reps} onChange={e => setNewEx(p => ({ ...p, reps: e.target.value }))} style={inp()} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setAdding(false)} style={{ ...btn("#1e1e28"), flex: 0.4, color: "#888" }}>Cancel</button>
+              <button onClick={addEx} style={{ ...btn("#2563eb"), flex: 1 }}>Add</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setAdding(true)} style={{ width: "100%", marginTop: 12, background: "#1a1a24", border: "1px dashed #2a2a38", borderRadius: 12, color: "#555", fontSize: 14, padding: 14 }}>+ Add Exercise</button>
+        )}
       </div>
-      <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={onRetry} style={{ flex: 0.4, background: "#1a1a24", border: "1px solid #2a2a38", borderRadius: 12, color: "#888", fontSize: 14, fontWeight: 600, padding: 14 }}>Re-analyze</button>
-        <button onClick={onSave} disabled={saving} style={{ flex: 1, background: "linear-gradient(135deg, #166534, #16a34a)", border: "none", borderRadius: 12, color: "#fff", fontSize: 15, fontWeight: 700, padding: 14, fontFamily: "'Syne', sans-serif" }}>
-          {saving ? "Saving..." : "Log This Meal ✓"}
-        </button>
-      </div>
+      <BottomBar>
+        <button onClick={async () => { setSaving(true); await onSave({ ...day, exercises }); }} disabled={saving} style={btn("#16a34a")}>{saving ? "Saving..." : "Save Workout ✓"}</button>
+      </BottomBar>
     </div>
   );
 }
 
-function HistoryScreen({ meals, onBack }) {
-  const byDate = meals.reduce((acc, m) => {
-    if (!acc[m.date]) acc[m.date] = [];
-    acc[m.date].push(m);
-    return acc;
-  }, {});
-  const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+function DayScreen({ day, session, activeExercise, setActiveExercise, updateSet, updateNote, onSave, onBack, getLastWeight, swimLog, setSwimLog, saving, error, benchPrescription }) {
+  const exercises = day.exercises;
+
+  if (day.swim) return (
+    <div style={wrap()}>
+      <TopBar title={day.title} sub={day.label} color={day.color} onBack={onBack} />
+      <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+        <div style={{ color: "#666", fontSize: 13, marginBottom: 20 }}>{day.note}</div>
+        {["duration", "distance", "notes"].map(f => (
+          <div key={f} style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: "#444", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>{f}</div>
+            <input value={swimLog[f]} onChange={e => setSwimLog(p => ({ ...p, [f]: e.target.value }))}
+              placeholder={f === "duration" ? "e.g. 45 min" : f === "distance" ? "e.g. 1500m" : "Notes..."} style={inp()} />
+          </div>
+        ))}
+        {error && <Err msg={error} />}
+      </div>
+      <BottomBar><button onClick={onSave} disabled={saving} style={btn(day.color)}>{saving ? "Saving..." : "Save Session"}</button></BottomBar>
+    </div>
+  );
+
+  if (day.mobility) return (
+    <div style={wrap()}>
+      <TopBar title={day.title} sub={day.label} color={day.color} onBack={onBack} />
+      <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+        {exercises.map(ex => (
+          <div key={ex.id} style={{ background: "#15151e", border: "1px solid #1e1e28", borderRadius: 10, padding: "14px 16px", marginBottom: 10 }}>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{ex.name}</div>
+            <div style={{ color: day.color, fontSize: 12, fontFamily: "'DM Mono', monospace", marginTop: 4 }}>{ex.reps}</div>
+            {ex.note && <div style={{ color: "#555", fontSize: 12, marginTop: 4 }}>{ex.note}</div>}
+          </div>
+        ))}
+        {error && <Err msg={error} />}
+      </div>
+      <BottomBar><button onClick={onSave} disabled={saving} style={btn(day.color)}>{saving ? "Saving..." : "Done"}</button></BottomBar>
+    </div>
+  );
+
+  const ex = exercises[activeExercise];
+  const isLate = ex?.phase1 === false;
+  const isProgrammed = ex?.programmed && benchPrescription;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0e", display: "flex", flexDirection: "column" }}>
-      <div style={{ padding: "max(20px, env(safe-area-inset-top)) 20px 16px", borderBottom: "1px solid #1a1a22", display: "flex", alignItems: "center", gap: 14, background: "#0f0f18" }}>
-        <button onClick={onBack} style={{ background: "#1a1a24", border: "none", color: "#666", width: 36, height: 36, borderRadius: 9, fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center" }}>‹</button>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700 }}>History</div>
-      </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
-        {dates.length === 0 && <div style={{ color: "#444", fontSize: 14, textAlign: "center", paddingTop: 40 }}>No meals logged yet.</div>}
-        {dates.map(date => {
-          const dayMeals = byDate[date];
-          const tot = dayMeals.reduce((a, m) => ({ cal: a.cal + (m.calories||0), prot: a.prot + (m.protein||0) }), { cal: 0, prot: 0 });
+    <div style={wrap()}>
+      <TopBar title={day.title} sub={`${day.label} · ${activeExercise + 1} of ${exercises.length}`} color={day.color} onBack={onBack} />
+      <div style={{ overflowX: "auto", display: "flex", gap: 8, padding: "12px 20px", borderBottom: "1px solid #1a1a22", scrollbarWidth: "none" }}>
+        {exercises.map((e, i) => {
+          const filled = session.sets[e.id]?.some(s => s?.weight || s?.reps);
           return (
-            <div key={date} style={{ marginBottom: 24 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15 }}>{date === today() ? "Today" : formatDate(date)}</div>
-                <div style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: "#888" }}>
-                  <span style={{ color: "#f59e0b" }}>{Math.round(tot.cal)}</span> cal · <span style={{ color: "#4ade80" }}>{Math.round(tot.prot)}g</span> protein
+            <button key={e.id} onClick={() => setActiveExercise(i)} style={{
+              flexShrink: 0, minWidth: 36, padding: "6px 13px", borderRadius: 20, border: "none", fontSize: 12,
+              background: i === activeExercise ? day.color : filled ? "#1a2a1a" : "#1e1e28",
+              color: i === activeExercise ? "#fff" : filled ? "#4ade80" : "#555",
+              fontWeight: i === activeExercise ? 600 : 400,
+            }}>{i + 1}</button>
+          );
+        })}
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px 0" }} className="fadein">
+        {isProgrammed && (
+          <div style={{ background: "#0d1a0d", border: "1px solid #1a3a1a", borderRadius: 10, padding: "10px 14px", marginBottom: 14 }}>
+            <div style={{ fontSize: 10, color: "#4ade80", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4, fontFamily: "'DM Mono', monospace" }}>Week {benchPrescription.week} · {benchPrescription.phase}</div>
+            <div style={{ fontSize: 14, color: "#f0f0f0", fontWeight: 600 }}>
+              {benchPrescription.sets} sets × {benchPrescription.reps} reps @ <span style={{ color: "#4ade80" }}>{benchPrescription.weight} lbs</span>
+            </div>
+            {benchPrescription.note && <div style={{ fontSize: 12, color: "#555", marginTop: 4 }}>{benchPrescription.note}</div>}
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: day.color, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>
+          {ex.sets} sets · {ex.reps} reps
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{ex.name}</div>
+        {ex.note && <div style={{ color: "#555", fontSize: 13, marginBottom: isLate ? 8 : 14 }}>{ex.note}</div>}
+        {isLate && <div style={{ color: "#d97706", fontSize: 12, background: "#1a150a", border: "1px solid #2a200a", borderRadius: 8, padding: "8px 12px", marginBottom: 14 }}>Add in week 5-6</div>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+          {Array.from({ length: ex.sets }, (_, si) => {
+            const setData = session.sets[ex.id]?.[si] || { weight: "", reps: "" };
+            const lastWt = getLastWeight(ex.id, si);
+            const filled = setData.weight || setData.reps;
+            return (
+              <div key={si} style={{
+                background: filled ? "#0d1a2a" : "#15151e",
+                border: `1px solid ${filled ? "#1e3a5a" : "#1e1e28"}`,
+                borderRadius: 10, padding: "12px 14px",
+                display: "flex", alignItems: "center", gap: 12,
+              }}>
+                <div style={{ width: 30, height: 30, borderRadius: "50%", background: filled ? day.color : "#1e1e28", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: filled ? "#fff" : "#444", flexShrink: 0 }}>{si + 1}</div>
+                <div style={{ flex: 1, display: "flex", gap: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, color: "#444", marginBottom: 5 }}>
+                      WEIGHT{isProgrammed ? ` · target: ${benchPrescription.weight}` : lastWt ? ` · last: ${lastWt}` : ""}
+                    </div>
+                    <input type="number" inputMode="decimal"
+                      placeholder={isProgrammed ? String(benchPrescription.weight) : lastWt || "lbs"}
+                      value={setData.weight} onChange={e => updateSet(ex.id, si, "weight", e.target.value)} style={inp()} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, color: "#444", marginBottom: 5 }}>REPS</div>
+                    <input type="number" inputMode="numeric"
+                      placeholder={isProgrammed ? String(benchPrescription.reps) : String(ex.reps)}
+                      value={setData.reps} onChange={e => updateSet(ex.id, si, "reps", e.target.value)} style={inp()} />
+                  </div>
                 </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {dayMeals.map(m => (
-                  <div key={m.id} style={{ background: "#0f0f18", border: "1px solid #1a1a28", borderRadius: 12, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{m.meal_name}</div>
-                      <div style={{ fontSize: 11, color: "#444", marginTop: 2, fontFamily: "'DM Mono', monospace" }}>
-                        P: {Math.round(m.protein)}g · C: {Math.round(m.carbs)}g · F: {Math.round(m.fat)}g
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#f59e0b", fontFamily: "'Syne', sans-serif" }}>{m.calories}</div>
+            );
+          })}
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 10, color: "#444", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>Notes (optional)</div>
+          <textarea value={session.notes?.[ex.id] || ""} onChange={e => updateNote(ex.id, e.target.value)}
+            placeholder="How did it feel? Anything to note..." rows={2}
+            style={{ width: "100%", background: "#15151e", border: "1px solid #2a2a38", borderRadius: 8, color: "#f0f0f0", fontSize: 14, padding: "10px 12px", resize: "none", outline: "none" }} />
+        </div>
+        {error && <Err msg={error} />}
+      </div>
+      <BottomBar>
+        <div style={{ display: "flex", gap: 10 }}>
+          {activeExercise > 0 && (
+            <button onClick={() => setActiveExercise(p => p - 1)} style={{ ...btn("#1e1e28"), flex: 0.4, color: "#888" }}>← Back</button>
+          )}
+          {activeExercise < exercises.length - 1 ? (
+            <button onClick={() => setActiveExercise(p => p + 1)} style={{ ...btn(day.color), flex: 1 }}>Next →</button>
+          ) : (
+            <button onClick={onSave} disabled={saving} style={{ ...btn("#16a34a"), flex: 1 }}>{saving ? "Saving..." : "Save Session ✓"}</button>
+          )}
+        </div>
+      </BottomBar>
+    </div>
+  );
+}
+
+function BenchScreen({ benchLog, onBack }) {
+  const log = [...benchLog].sort((a, b) => b.date.localeCompare(a.date));
+  const nextIdx = Math.min(benchLog.length, BENCH_PROGRAM.length - 1);
+  const next = BENCH_PROGRAM[nextIdx];
+  return (
+    <div style={wrap()}>
+      <TopBar title="Bench Program" sub="16-Week | 210 → 240 lbs" color="#4ade80" onBack={onBack} />
+      <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+        {next && (
+          <div style={{ background: "#0d1f0d", border: "1px solid #1a3a1a", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+            <div style={{ fontSize: 10, color: "#4ade80", letterSpacing: 2, marginBottom: 8, fontFamily: "'DM Mono', monospace" }}>NEXT SESSION · WEEK {next.week} · {next.phase.toUpperCase()}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{next.weight} lbs</div>
+            <div style={{ fontSize: 14, color: "#888" }}>{next.sets} sets × {next.reps} reps</div>
+            {next.note && <div style={{ fontSize: 12, color: "#555", marginTop: 8 }}>{next.note}</div>}
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: "#444", letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>Full 16-Week Schedule</div>
+        {[1,2,3,4].map(phase => {
+          const ranges = [[1,4],[5,8],[9,12],[13,16]];
+          const [start, end] = ranges[phase-1];
+          const names = ["Volume","Strength","Power","Peak/Test"];
+          const colors = ["#60a5fa","#f59e0b","#f87171","#4ade80"];
+          const weeks = Array.from({length: end-start+1}, (_,i) => i+start);
+          return (
+            <div key={phase} style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11, color: colors[phase-1], fontWeight: 600, marginBottom: 8, fontFamily: "'DM Mono', monospace", letterSpacing: 1 }}>
+                PHASE {phase}: {names[phase-1].toUpperCase()} (WKS {start}-{end})
+              </div>
+              {weeks.map(week => {
+                const s = BENCH_PROGRAM.find(p => p.week === week);
+                if (!s) return null;
+                const progIdx = BENCH_PROGRAM.findIndex(p => p.week === week);
+                const done = benchLog.length > progIdx;
+                return (
+                  <div key={week} style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: "1px solid #1a1a22", alignItems: "center" }}>
+                    <div style={{ width: 48, fontSize: 11, color: done ? "#4ade80" : "#555", fontFamily: "'DM Mono', monospace" }}>Wk {week}</div>
+                    <div style={{ width: 68, fontSize: 13, fontWeight: 600, color: done ? "#555" : "#f0f0f0" }}>{s.weight} lbs</div>
+                    <div style={{ fontSize: 12, color: "#555" }}>{s.sets}×{s.reps}</div>
+                    <div style={{ fontSize: 11, color: "#444", flex: 1, textAlign: "right" }}>{s.phase}</div>
+                    {done && <span style={{ color: "#4ade80", fontSize: 14 }}>✓</span>}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+        <div style={{ fontSize: 11, color: "#444", letterSpacing: 2, textTransform: "uppercase", marginBottom: 12, marginTop: 8 }}>Session Log</div>
+        {log.length === 0 && <div style={{ color: "#444", fontSize: 14 }}>No bench sessions logged yet.</div>}
+        {log.map((entry, i) => {
+          const topSet = entry.sets?.reduce((best, s) => (parseFloat(s?.weight)||0) > (parseFloat(best?.weight)||0) ? s : best, {});
+          return (
+            <div key={i} style={{ background: "#15151e", border: "1px solid #1e1e28", borderRadius: 10, padding: "14px 16px", marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ fontWeight: 600 }}>{formatDate(entry.date)}</div>
+                {topSet?.weight && <div style={{ color: "#4ade80", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>Top: {topSet.weight} × {topSet.reps}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {entry.sets?.map((s, si) => (
+                  <div key={si} style={{ background: "#1e1e28", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontFamily: "'DM Mono', monospace", color: "#666" }}>
+                    S{si+1}: {s?.weight||"--"} × {s?.reps||"--"}
                   </div>
                 ))}
               </div>
@@ -519,15 +619,67 @@ function HistoryScreen({ meals, onBack }) {
   );
 }
 
-function Spinner() {
-  return <div style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />;
+function HistoryScreen({ sessions, days, onBack }) {
+  const sorted = [...sessions].filter(s => s.complete).sort((a, b) => b.date.localeCompare(a.date));
+  return (
+    <div style={wrap()}>
+      <TopBar title="Session History" sub={`${sorted.length} sessions`} color="#888" onBack={onBack} />
+      <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+        {sorted.length === 0 && <div style={{ color: "#444", fontSize: 14 }}>No sessions logged yet.</div>}
+        {sorted.map(s => {
+          const day = days.find(d => d.id === s.day_id);
+          return (
+            <div key={s.id} style={{ background: "#15151e", borderLeft: `3px solid ${day?.color || "#444"}`, border: "1px solid #1e1e28", borderRadius: 10, padding: "14px 16px", marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 11, color: day?.color, letterSpacing: 1, textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: 3 }}>{day?.label}</div>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{day?.title}</div>
+                  <div style={{ color: "#444", fontSize: 12, marginTop: 3 }}>{formatDate(s.date)}</div>
+                </div>
+                <div style={{ color: "#4ade80", fontSize: 18 }}>✓</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TopBar({ title, sub, color, onBack }) {
+  return (
+    <div style={{ padding: "max(18px, env(safe-area-inset-top)) 20px 14px", borderBottom: "1px solid #1a1a22", display: "flex", alignItems: "center", gap: 14, flexShrink: 0, background: "#0f0f13" }}>
+      <button onClick={onBack} style={{ background: "#1e1e28", border: "none", color: "#666", width: 36, height: 36, borderRadius: 9, fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>‹</button>
+      <div>
+        <div style={{ fontSize: 11, color, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>{sub}</div>
+        <div style={{ fontSize: 17, fontWeight: 700 }}>{title}</div>
+      </div>
+    </div>
+  );
+}
+
+function BottomBar({ children }) {
+  return (
+    <div style={{ padding: "12px 20px", paddingBottom: "max(20px, env(safe-area-inset-bottom))", borderTop: "1px solid #1a1a22", background: "#0f0f13", flexShrink: 0 }}>
+      {children}
+    </div>
+  );
 }
 
 function Loader() {
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0e", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-      <div style={{ width: 36, height: 36, border: "3px solid #1a1a24", borderTop: "3px solid #f59e0b", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-      <div style={{ color: "#444", fontSize: 13 }}>Loading...</div>
+    <div style={{ minHeight: "100vh", background: "#0f0f13", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+      <div style={{ width: 36, height: 36, border: "3px solid #222", borderTop: "3px solid #2563eb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <div style={{ color: "#555", fontSize: 13 }}>Loading...</div>
     </div>
   );
 }
+
+function Err({ msg }) {
+  return <div style={{ background: "#2a0d0d", border: "1px solid #5a1a1a", borderRadius: 8, padding: "10px 14px", color: "#f87171", fontSize: 13, marginBottom: 16 }}>{msg}</div>;
+}
+
+const wrap = () => ({ minHeight: "100vh", background: "#0f0f13", display: "flex", flexDirection: "column" });
+const inp = () => ({ background: "#1e1e28", border: "1px solid #2a2a38", borderRadius: 8, color: "#f0f0f0", fontSize: 16, padding: "10px 12px", width: "100%", fontFamily: "'DM Mono', monospace" });
+const btn = (bg) => ({ background: bg, border: "none", borderRadius: 10, color: "#fff", fontSize: 15, fontWeight: 600, padding: 15, width: "100%", fontFamily: "'DM Sans', sans-serif" });
+const pill = (bg, color) => ({ background: bg, border: "1px solid #2a2a38", borderRadius: 20, color, fontSize: 12, fontWeight: 500, padding: "7px 16px", fontFamily: "'DM Sans', sans-serif" });
